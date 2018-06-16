@@ -5,8 +5,12 @@ import java.util.LinkedList;
 
 public class Network {
     private ArrayList<Replica> peers = new ArrayList<>();
-    private ArrayList<LinkedList<Message>> messageQueues;
+    private ArrayList<LinkedList<Message>> messageQueues = new ArrayList<>();
 
+    /**
+     * Adds a peer to the network
+     * @param replica
+     */
     public void addPeer(Replica replica){
         replica.network = this;
         replica.clock = new Clock(peers.size(), 0);

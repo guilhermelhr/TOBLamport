@@ -1,6 +1,5 @@
 package br.unicamp.ic.students.ra169052;
 
-import java.util.ArrayList;
 import java.util.LinkedList;
 
 public class Replica {
@@ -81,12 +80,19 @@ public class Replica {
         clock.value = Math.max(clock.value, remoteClock) + 1;
     }
 
+    /**
+     * Adds message to the queue specified by it's clock pid
+     * @param message
+     */
     private void addMessageToQueue(Message message){
         synchronized (queues[message.clock.pid]){
             queues[message.clock.pid].add(message);
         }
     }
 
+    /**
+     * Starts thread for handling database operations
+     */
     public void startDatabaseThread(){
         new Thread(() -> {
             while(true){
@@ -129,21 +135,37 @@ public class Replica {
         }).start();
     }
 
+    /**
+     * Starts thread for handling incoming messages
+     */
     public void startMessengerThread(){
         new Thread(() -> {
             while(true) {
+                //try to get a message for this replica
                 Message message = network.getMessageFor(clock.pid);
                 if(message != null){
+                    //check if the message comes from a client or a replica
                     if(message.clock.pid == CLIENT_PID){
                         handleClientMessage(message);
                     }else{
                         handleReplicaMessage(message);
                     }
                 }
+
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    System.exit(1);
+                }
             }
         }).start();
     }
 
+    /**
+     * Handles a message sent by a client
+     * @param message
+     */
     private void handleClientMessage(Message message) {
         switch (message.action){
             case SREAD:
@@ -152,10 +174,6 @@ public class Replica {
                 clock.increment();
                 break;
             case DREAD:
-                message.clock = clock;
-                network.broadcast(message);
-                clock.increment();
-                break;
             case WRITE:
                 message.clock = clock;
                 network.broadcast(message);
@@ -164,6 +182,10 @@ public class Replica {
         }
     }
 
+    /**
+     * Handles a message sent by a replica
+     * @param message
+     */
     private void handleReplicaMessage(Message message) {
         switch (message.action){
             case SREAD:
@@ -198,6 +220,6 @@ public class Replica {
 
 
     public static void main(String[] args) {
-	// write your code here
+
     }
 }
