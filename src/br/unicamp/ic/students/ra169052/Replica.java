@@ -4,12 +4,21 @@ import java.util.LinkedList;
 
 public class Replica {
     public static final int CLIENT_PID = -1;
+    public static final int REPLICAS_COUNT = 5;
 
     public Network network;
     public Clock clock;
 
     private LinkedList<Message>[] queues;
     private int db = Integer.MAX_VALUE;
+
+    public Replica(){
+        //initialize queues
+        queues = new LinkedList[REPLICAS_COUNT];
+        for (int i = 0; i < REPLICAS_COUNT; i++){
+            queues[i] = new LinkedList<>();
+        }
+    }
 
     /**
      * Checks if any queue is empty
@@ -28,7 +37,7 @@ public class Replica {
     /**
      * Sends a POKE message to every replica with an empty queue
      */
-    private void pokeEmptyReplicas() throws InterruptedException {
+    private void pokeEmptyReplicas() {
         int emptyQueuePid;
         while ((emptyQueuePid = findEmptyQueue()) != -1){
             Message message = new Message(clock, Message.Action.POKE);
@@ -36,12 +45,13 @@ public class Replica {
             clock.increment();
 
             while(true){
-                synchronized (queues) {
+                synchronized (queues[emptyQueuePid]) {
                     if (!queues[emptyQueuePid].isEmpty()) {
                         break;
                     }
                 }
-                Thread.sleep(500);
+
+                sleepFor(500);
             }
         }
     }
@@ -97,12 +107,7 @@ public class Replica {
         new Thread(() -> {
             while(true){
                 //ensure all queues are populated
-                try {
-                    pokeEmptyReplicas();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    System.exit(1);
-                }
+                pokeEmptyReplicas();
 
                 //process messages while no queue is empty
                 while(allQueuesPopulated()){
@@ -125,12 +130,7 @@ public class Replica {
                     }
                 }
 
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    System.exit(1);
-                }
+                sleepFor(100);
             }
         }).start();
     }
@@ -152,12 +152,7 @@ public class Replica {
                     }
                 }
 
-                try {
-                    Thread.sleep(500);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    System.exit(1);
-                }
+                sleepFor(500);
             }
         }).start();
     }
@@ -171,15 +166,15 @@ public class Replica {
             case SREAD:
                 message.clock = clock;
                 network.sendTo(message, clock.pid);
-                clock.increment();
                 break;
             case DREAD:
             case WRITE:
                 message.clock = clock;
                 network.broadcast(message);
-                clock.increment();
                 break;
         }
+
+        clock.increment();
     }
 
     /**
@@ -187,22 +182,21 @@ public class Replica {
      * @param message
      */
     private void handleReplicaMessage(Message message) {
+        updateClock(message.clock.value);
+
         switch (message.action){
             case SREAD:
             case DREAD:
             case WRITE:
-                updateClock(message.clock.value);
                 addMessageToQueue(message);
                 break;
             case POKE:
                 int destination = message.clock.pid;
-                updateClock(message.clock.value);
                 message.action = Message.Action.ACK;
                 message.clock = clock;
                 network.sendTo(message, destination);
                 break;
             case ACK:
-                updateClock(message.clock.value);
                 LinkedList<Message> queue = queues[message.clock.pid];
                 synchronized (queue){
                     if(queue.isEmpty()){
@@ -211,13 +205,23 @@ public class Replica {
                 }
                 break;
             case REPLY:
-                updateClock(message.clock.value);
                 network.sendTo(message, CLIENT_PID);
                 break;
         }
     }
 
-
+    /**
+     * Sleeps thread for about millis ms
+     * @param millis
+     */
+    private void sleepFor(int millis){
+        try {
+            Thread.sleep(millis + (int) ((Math.random() - 0.5) * millis));
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+    }
 
     public static void main(String[] args) {
 
