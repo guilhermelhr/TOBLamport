@@ -123,12 +123,13 @@ public class Replica {
                             message.action = Message.Action.REPLY;
                             message.payload = db;
                             network.sendTo(message, message.clock.pid);
-                            clock.increment();
                             break;
                         case WRITE:
                             db = message.payload;
                             break;
                     }
+
+                    clock.increment();
                 }
 
                 sleepFor(100);
