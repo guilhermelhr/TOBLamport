@@ -8,6 +8,7 @@ public class Message {
     public Clock clock;
     public Action action;
     public int payload;
+    public int index;
 
     public Message(Clock clock, Action action){
         this.clock = clock;

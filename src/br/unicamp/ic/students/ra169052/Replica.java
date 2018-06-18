@@ -4,12 +4,13 @@ import java.util.LinkedList;
 
 public class Replica {
     public static final int CLIENT_PID = -1;
+    public static final int DB_SIZE = 2048;
 
     public Network network;
     public Clock clock;
 
     private LinkedList<Message>[] queues;
-    private int db = Integer.MAX_VALUE;
+    private int[] db = new int[2048];
 
     /**
      * Checks if any queue is empty
@@ -41,7 +42,7 @@ public class Replica {
                         break;
                     }
                 }
-                Thread.sleep(500);
+                sleepFor(500);
             }
         }
     }
@@ -97,12 +98,7 @@ public class Replica {
         new Thread(() -> {
             while(true){
                 //ensure all queues are populated
-                try {
-                    pokeEmptyReplicas();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    System.exit(1);
-                }
+                pokeEmptyReplicas();
 
                 //process messages while no queue is empty
                 while(allQueuesPopulated()){
@@ -116,21 +112,16 @@ public class Replica {
                         case SREAD:
                         case DREAD:
                             message.action = Message.Action.REPLY;
-                            message.payload = db;
+                            message.payload = db[message.index];
                             network.sendTo(message, message.clock.pid);
                             break;
                         case WRITE:
-                            db = message.payload;
+                            db[message.index] = message.payload;
                             break;
                     }
                 }
 
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    System.exit(1);
-                }
+                sleepFor(100);
             }
         }).start();
     }
@@ -152,12 +143,7 @@ public class Replica {
                     }
                 }
 
-                try {
-                    Thread.sleep(500);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    System.exit(1);
-                }
+                sleepFor(500);
             }
         }).start();
     }
@@ -217,7 +203,18 @@ public class Replica {
         }
     }
 
-
+    /**
+     * Sleeps for around milis ms
+     * @param milis
+     */
+    private void sleepFor(int milis){
+        try {
+            Thread.sleep(milis + (int) ((Math.random() - 0.5) * 0.5 * milis));
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+    }
 
     public static void main(String[] args) {
 
