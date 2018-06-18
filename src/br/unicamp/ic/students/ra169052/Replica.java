@@ -42,10 +42,11 @@ public class Replica {
     /**
      * Sends a POKE message to every replica with an empty queue
      */
-    private void pokeEmptyReplicas(LinkedList<Message>[] queues) {
+    private void pokeEmptyReplicas(LinkedList<Message>[] queues, int index) {
         int emptyQueuePid;
         while ((emptyQueuePid = findEmptyQueue(queues)) != -1){
             Message message = new Message(clock, Message.Action.POKE);
+            message.index = index;
             network.sendTo(message, emptyQueuePid);
             clock.increment();
 
@@ -108,11 +109,15 @@ public class Replica {
      * Starts thread for handling database operations
      */
     public void startDatabaseThread(){
-        new Thread(() -> {
-            while(true){
-                for(LinkedList<Message>[] queues : dbQueues) {
+        for(int i = 0; i < DB_SIZE; i++) {
+            LinkedList<Message>[] queues = dbQueues[i];
+
+            //this is necessary for using i inside the thread
+            final int index = i;
+            new Thread(() -> {
+                while(true){
                     //ensure all queues are populated
-                    pokeEmptyReplicas(queues);
+                    pokeEmptyReplicas(queues, index);
 
                     //process messages while no queue is empty
                     while (allQueuesPopulated(queues)) {
@@ -134,11 +139,11 @@ public class Replica {
                                 break;
                         }
                     }
-                }
 
-                sleepFor(100);
-            }
-        }).start();
+                    sleepFor(100);
+                }
+            }).start();
+        }
     }
 
     /**
